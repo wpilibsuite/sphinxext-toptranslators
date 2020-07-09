@@ -3,6 +3,7 @@ from docutils import nodes
 from git import Repo
 from pathlib import Path
 from sphinx.util.docutils import SphinxDirective
+from sphinx.application import Sphinx
 import os, stat
 import shutil
 
@@ -68,10 +69,6 @@ def get_top_translators(locale_path: str, locale: str):
     return contributors
 
 
-def get_config(app):
-    return app.get_config()
-
-
 class Contributor:
     def __init__(self, name, alphabetical, contributions=0):
         self.name = name
@@ -102,7 +99,7 @@ class ContributorSource:
             node_contributor += contributor.build()
             node_list += node_contributor
 
-            if i == limit:
+            if i == self.limit:
                 break
 
         return node_list
@@ -115,42 +112,42 @@ class TopTranslators(SphinxDirective):
     final_argument_whitespace = True
     option_spec = {
         'limit': directives.positive_int,
-        'locale': directives.unchanged_required
+        'locale': directives.unchanged_required,
         'order': directives.unchanged,
     }
 
-    def run(self):
+    def run(self, app: Sphinx):
         limit = self.options.get('limit', 10)
         order = self.options.get('order', 'alphabetical')
         locale = self.options.get('local')
 
-        config = get_config()
+        config = app.get_config()
         top_translators_git = config["top_translators_git"]
         top_translators_locale = config["top_translators_locale"]
 
         del_directory_exists(TEMP_DIR_NAME)
 
         # Clone repo if given as parameter
-        if (url is not None):
+        if top_translators_git is not None:
             try:
                 Repo.clone_from(top_translators_git, TEMP_DIR_NAME)
             except:
                 raise ValueError("Invalid git repository given!")
         
         contributors = get_top_translators(top_translators_locale, locale)
-        alphabetical = order in alphabetical
+        alphabetical = 'alphabetical' in order
 
         contributors_output = []
         for contributor in contributors.keys():
-            contributors_output.append(Contributor(contributor, alphabetical, contributions[contributor]))
+            contributors_output.append(Contributor(contributor, alphabetical, contributors[contributor]))
 
         return [ContributorSource(contributors_output, limit=limit)]
             
         
 
 def setup(app):
-    app.add_config_value("top_translators_git", None)
-    app.add_config_value("top_translators_locale")
+    app.add_config_value("top_translators_git", None, 'html')
+    app.add_config_value("top_translators_locale", 'html')
     directives.register_directive('toptranslators', TopTranslators)
 
     return {
