@@ -107,7 +107,7 @@ class ContributorSource:
 
 class TopTranslators(SphinxDirective):
     has_content = True
-    required_arguments = 2
+    required_arguments = 0
     optional_arguments = 0
     final_argument_whitespace = True
     option_spec = {
@@ -116,14 +116,13 @@ class TopTranslators(SphinxDirective):
         'order': directives.unchanged,
     }
 
-    def run(self, app: Sphinx):
+    def run(self):
         limit = self.options.get('limit', 10)
         order = self.options.get('order', 'alphabetical')
         locale = self.options.get('local')
 
-        config = app.get_config()
-        top_translators_git = config["top_translators_git"]
-        top_translators_locale = config["top_translators_locale"]
+        top_translators_git = self.config["top_translators_git"]
+        top_translators_locale = self.config["top_translators_locale"]
 
         del_directory_exists(TEMP_DIR_NAME)
 
@@ -137,6 +136,8 @@ class TopTranslators(SphinxDirective):
         contributors = get_top_translators(top_translators_locale, locale)
         alphabetical = 'alphabetical' in order
 
+        del_directory_exists(TEMP_DIR_NAME)
+
         contributors_output = []
         for contributor in contributors.keys():
             contributors_output.append(Contributor(contributor, alphabetical, contributors[contributor]))
@@ -147,7 +148,7 @@ class TopTranslators(SphinxDirective):
 
 def setup(app):
     app.add_config_value("top_translators_git", None, 'html')
-    app.add_config_value("top_translators_locale", 'html')
+    app.add_config_value("top_translators_locale", None, 'html')
     directives.register_directive('toptranslators', TopTranslators)
 
     return {
