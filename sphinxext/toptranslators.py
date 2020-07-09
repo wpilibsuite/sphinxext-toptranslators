@@ -53,6 +53,7 @@ def grab_contributors(path: str):
 # Requires that git is currently in path
 def get_top_translators(locale_path: str, locale: str):
     contributors = {}
+    print("LOCALE", locale)
     LOCALE_DIR = Path(TEMP_DIR_NAME + "/" + locale_path + "/" + locale + "/")
     for root, subFolder, files in os.walk(LOCALE_DIR, onerror=ValueError("Invalid locale directory of locale option!")):
         for item in files:
@@ -78,12 +79,13 @@ class Contributor:
 
     def build(self):
         node_contributor = nodes.paragraph()
-        node_contributor += nodes.reference(text=self.name)
+        node_contributor += nodes.Text(self.name)
 
         if self.alphabetical != True:
             node_contributor += nodes.Text(' - ' + str(self.contributions) + ' ' +
                                                     ('contributions' if self.contributions != 1 else 'contribution'))
         
+        return node_contributor
 
 class ContributorSource:
     def __init__(self, contributors, limit=10):
@@ -96,7 +98,7 @@ class ContributorSource:
         i = 0
         for contributor in self.contributors:
             node_contributor = nodes.list_item()
-            node_contributor += contributor.build()
+            node_contributor.append(contributor.build())
             node_list += node_contributor
 
             if i == self.limit:
@@ -119,10 +121,10 @@ class TopTranslators(SphinxDirective):
     def run(self):
         limit = self.options.get('limit', 10)
         order = self.options.get('order', 'alphabetical')
-        locale = self.options.get('local')
+        locale = self.options.get('locale')
 
         top_translators_git = self.config["top_translators_git"]
-        top_translators_locale = self.config["top_translators_locale"]
+        top_translators_locale = self.config["top_translators_locale_dir"]
 
         del_directory_exists(TEMP_DIR_NAME)
 
@@ -142,13 +144,12 @@ class TopTranslators(SphinxDirective):
         for contributor in contributors.keys():
             contributors_output.append(Contributor(contributor, alphabetical, contributors[contributor]))
 
-        return [ContributorSource(contributors_output, limit=limit)]
+        return [ContributorSource(contributors_output, limit=limit).build()]
             
         
-
 def setup(app):
     app.add_config_value("top_translators_git", None, 'html')
-    app.add_config_value("top_translators_locale", None, 'html')
+    app.add_config_value("top_translators_locale_dir", None, 'html')
     directives.register_directive('toptranslators', TopTranslators)
 
     return {
