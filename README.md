@@ -17,7 +17,7 @@ Sphinx extension to grab top contributors from a PO directory that Sphinx genera
 - *top_translators_git* - Value: (Str) URL of the github directory containing your locale
 
 ### Directive Configuration
-Directive is `` .. toptranslators``
+Directive is `` .. toptranslators::``
 
 with the following options:
 
