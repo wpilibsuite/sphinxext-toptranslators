@@ -8,16 +8,9 @@ Sphinx extension to grab top contributors from a PO directory that Sphinx genera
 
 ## Usage
 
-### Global
-
-- *top_translators_locale_dir* - Value: (Str) Location of your locale directory
-
-#### REQUIRED
-
-- *top_translators_git* - Value: (Str) URL of the github directory containing your locale
 
 ### Directive Configuration
-Directive is `` .. toptranslators::``
+Directive is `` .. toptranslators:: GITHUB_REPO_NAME``
 
 with the following options:
 
@@ -25,12 +18,16 @@ with the following options:
 
 - *:limit:* limit the number of shown contributors
 
-- *:order:* default is alphabetical, but can be set to numerical
+- *:order:* default is `alphabetical`, but can be set to `numerical`
+
+- *:hide_contributions:* Whether or not to hide how many contributions each contributor as made. default is `false`
 
 ### Example
 
 ```
-  .. toptranslators::
+  .. toptranslators:: wpilibsuite/frc-docs-translations
     :locale: fr
     :limit: 10
+    :order: alphabetical
+    :hide_contributions: true
 ```
