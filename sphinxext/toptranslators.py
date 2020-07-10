@@ -39,7 +39,6 @@ def grab_contributors(path: str) -> Iterable:
 
 def get_top_translators(translations_dir: str, locale: str) -> Mapping[str, int]:
     contributors = Counter()
-    print("LOCALE", locale)
 
     po_files = glob(str(Path(translations_dir) / "**" / locale / "**" / "*.po"), recursive=True)
 
