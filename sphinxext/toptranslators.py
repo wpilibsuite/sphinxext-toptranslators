@@ -77,12 +77,12 @@ class ContributorSource:
     def build(self) -> nodes.Node:
         node_list = nodes.bullet_list()
         for idx, contributor in enumerate(self.contributors):
+            if idx == self.limit:
+                break
             node_contributor = nodes.list_item()
             node_contributor += contributor.build()
             node_list += node_contributor
 
-            if idx == self.limit:
-                break
 
         return node_list
 
