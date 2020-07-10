@@ -1,156 +1,142 @@
-from docutils.parsers.rst import directives
-from docutils import nodes
-from git import Repo
+from collections import Counter
+from glob import glob
 from pathlib import Path
-from sphinx.util.docutils import SphinxDirective
+import re
+import tempfile
+from typing import Any, Dict, Iterable, List, Mapping
+
+from docutils import nodes
+from docutils.parsers.rst import directives
 from sphinx.application import Sphinx
-import os, stat
-import shutil
+from sphinx.errors import ExtensionError
+from sphinx.util.docutils import SphinxDirective
+
+from git import Repo
 
 
-TEMP_DIR_NAME = "temp_toptranslators"
 TRANSLATORS_MARKER_NAME = "# Translators:"
-# TODO REPLACE THIS WITH SPHINX ARG
-LANGUAGES = ['es', 'fr']
 
 
-# Workaround due to git-python storing handles after program execution
-def del_rw(action, name, exc):
-    os.chmod(name, stat.S_IWRITE)
-    os.remove(name)
-
-
-# Delete directory if exists
-def del_directory_exists(directory: str):
-    dirpath = Path(TEMP_DIR_NAME)
-    if dirpath.exists() and dirpath.is_dir():
-        shutil.rmtree(dirpath, onerror=del_rw)
-    else:
-        print("Directory does not exist!")
-
-
-def grab_contributors(path: str):
+def grab_contributors(path: str) -> Iterable:
     found = False
-    translators = []
-    start = '# '
-    end = ' <'
-    with open(path, encoding="utf8") as f:
-        for line in f.readlines():
-            if found:
-                if start not in line and end not in line:
-                    break
-                else:
-                    line = line[line.find(start)+len(start):line.rfind(end)]
-                    if len(line) > 2:
-                        translators.append(line)
-            if TRANSLATORS_MARKER_NAME in line:
+    translators = set()
+    with open(path, encoding="utf-8") as file:
+        for line in file:
+            if not found and TRANSLATORS_MARKER_NAME in line:
                 found = True
+                continue
+
+            if found:
+                line = line.strip("#\r\n ")
+
+                if len(line) == 0:
+                    break
+
+                translators.add(re.search(r"(.*?)(,| <).*", line).group(1).title())
 
     return translators
-    
 
-# Clones the repo to get top translators
-# Requires that git is currently in path
-def get_top_translators(locale_path: str, locale: str):
-    contributors = {}
+
+def get_top_translators(translations_dir: str, locale: str) -> Mapping[str, int]:
+    contributors = Counter()
     print("LOCALE", locale)
-    LOCALE_DIR = Path(TEMP_DIR_NAME + "/" + locale_path + "/" + locale + "/")
-    for root, subFolder, files in os.walk(LOCALE_DIR, onerror=ValueError("Invalid locale directory of locale option!")):
-        for item in files:
-            if item.endswith(".po"):
-                path = os.path.join(root, item)
-                for contributor in grab_contributors(path):
-                    if contributor not in contributors:
-                        contributors[contributor] = 1
-                    else:
-                        contributors[contributor] += 1
 
-    contributors = {contributor: contributors[contributor] for contributor in sorted(contributors, key=contributors.get, reverse=True)}
+    po_files = glob(str(Path(translations_dir) / "**" / locale / "**" / "*.po"), recursive=True)
+
+    for file in po_files:
+        contributors.update(grab_contributors(file))
 
     return contributors
 
 
 class Contributor:
-    def __init__(self, name, alphabetical, contributions=0):
+    def __init__(self, name, hide_contributions, contributions=0):
         self.name = name
-        self.alphabetical = alphabetical
+        self.hide_contributions = hide_contributions
         self.contributions = contributions
 
-
-    def build(self):
+    def build(self) -> nodes.Node:
         node_contributor = nodes.paragraph()
         node_contributor += nodes.Text(self.name)
 
-        if self.alphabetical != True:
-            node_contributor += nodes.Text(' - ' + str(self.contributions) + ' ' +
-                                                    ('contributions' if self.contributions != 1 else 'contribution'))
-        
+        if not self.hide_contributions:
+            node_contributor += nodes.Text(
+                " - "
+                + str(self.contributions)
+                + " "
+                + ("contributions" if self.contributions != 1 else "contribution")
+            )
         return node_contributor
+
 
 class ContributorSource:
     def __init__(self, contributors, limit=10):
         self.contributors = contributors
         self.limit = limit
 
-
-    def build(self):
+    def build(self) -> nodes.Node:
         node_list = nodes.bullet_list()
-        i = 0
-        for contributor in self.contributors:
+        for idx, contributor in enumerate(self.contributors):
+            if idx == self.limit:
+                break
             node_contributor = nodes.list_item()
-            node_contributor.append(contributor.build())
+            node_contributor += contributor.build()
             node_list += node_contributor
 
-            if i == self.limit:
-                break
 
         return node_list
 
 
 class TopTranslators(SphinxDirective):
     has_content = True
-    required_arguments = 0
+    required_arguments = 1
     optional_arguments = 0
     final_argument_whitespace = True
     option_spec = {
-        'limit': directives.positive_int,
-        'locale': directives.unchanged_required,
-        'order': directives.unchanged,
+        "limit": directives.positive_int,
+        "locale": directives.unchanged_required,
+        "order": directives.unchanged,
+        "hide_contributions": directives.unchanged,
     }
 
-    def run(self):
-        limit = self.options.get('limit', 10)
-        order = self.options.get('order', 'alphabetical')
-        locale = self.options.get('locale')
+    def run(self) -> List[nodes.Node]:
+        limit: int = self.options.get("limit", 10)
+        order: str = self.options.get("order", "alphabetical").lower()
+        locale: str = self.options.get("locale")
+        hide_contributions: bool = "true" in self.options.get(
+            "hide_contributions", "false"
+        ).lower()
 
-        top_translators_git = self.config["top_translators_git"]
-        top_translators_locale = self.config["top_translators_locale_dir"]
+        with tempfile.TemporaryDirectory() as temp_dir:
 
-        del_directory_exists(TEMP_DIR_NAME)
+            repo_url = f"https://github.com/{self.arguments[0]}.git"
 
-        # Clone repo if given as parameter
-        if top_translators_git is not None:
+            # Clone repo
             try:
-                Repo.clone_from(top_translators_git, TEMP_DIR_NAME)
-            except:
-                raise ValueError("Invalid git repository given!")
-        
-        contributors = get_top_translators(top_translators_locale, locale)
-        alphabetical = 'alphabetical' in order
+                Repo.clone_from(repo_url, temp_dir)
+            except Exception as e:
+                raise ExtensionError("Invalid git repository given!", e)
 
-        del_directory_exists(TEMP_DIR_NAME)
+            contributors = get_top_translators(temp_dir, locale)
+            alphabetical = "alphabetical" in order
 
-        contributors_output = []
-        for contributor in contributors.keys():
-            contributors_output.append(Contributor(contributor, alphabetical, contributors[contributor]))
+            return [
+                ContributorSource(
+                    [
+                        Contributor(name, hide_contributions, contributions)
+                        for name, contributions in sorted(
+                            contributors.items(),
+                            key=lambda tup: tup[0] if alphabetical else tup[1],
+                            reverse=not alphabetical,
+                        )
+                    ],
+                    limit=limit,
+                ).build()
+            ]
 
-        return [ContributorSource(contributors_output, limit=limit).build()]
-            
-        
-def setup(app):
-    app.add_config_value("top_translators_git", None, 'html')
-    app.add_config_value("top_translators_locale_dir", None, 'html')
-    directives.register_directive('toptranslators', TopTranslators)
+
+def setup(app: Sphinx) -> Dict[str, Any]:
+    directives.register_directive("toptranslators", TopTranslators)
 
     return {
         "parallel_read_safe": True,
