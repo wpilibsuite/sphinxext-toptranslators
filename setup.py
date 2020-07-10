@@ -19,7 +19,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/wpilibsuite/sphinxext-toptranslators",
-    install_requires=['sphinx>=2.0'],
+    install_requires=['sphinx>=2.0', 'git'],
     packages=['sphinxext'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
