@@ -37,7 +37,7 @@ def grab_contributors(path: str) -> Iterable:
     return translators
 
 
-def get_top_translators(translations_dir: str, locale: str) -> Mapping[str, int]:
+def get_top_translators(translations_dir: str, locale: str) -> Counter:
     contributors = Counter()
 
     po_files = glob(str(Path(translations_dir) / "**" / locale / "**" / "*.po"), recursive=True)
@@ -69,20 +69,15 @@ class Contributor:
 
 
 class ContributorSource:
-    def __init__(self, contributors, limit=10):
+    def __init__(self, contributors):
         self.contributors = contributors
-        self.limit = limit
 
     def build(self) -> nodes.Node:
         node_list = nodes.bullet_list()
-        for idx, contributor in enumerate(self.contributors):
-            if idx == self.limit:
-                break
+        for contributor in self.contributors:
             node_contributor = nodes.list_item()
             node_contributor += contributor.build()
             node_list += node_contributor
-
-
         return node_list
 
 
@@ -116,20 +111,17 @@ class TopTranslators(SphinxDirective):
             except Exception as e:
                 raise ExtensionError("Invalid git repository given!", e)
 
-            contributors = get_top_translators(temp_dir, locale)
-            alphabetical = "alphabetical" in order
+            top_contributors = get_top_translators(temp_dir, locale).most_common(limit)
 
+            if "alphabetical" in order:
+                top_contributors.sort(key=lambda tup: tup[0])
+            
             return [
                 ContributorSource(
                     [
                         Contributor(name, hide_contributions, contributions)
-                        for name, contributions in sorted(
-                            contributors.items(),
-                            key=lambda tup: tup[0] if alphabetical else tup[1],
-                            reverse=not alphabetical,
-                        )
-                    ],
-                    limit=limit,
+                        for name, contributions in top_contributors
+                    ]
                 ).build()
             ]
 
