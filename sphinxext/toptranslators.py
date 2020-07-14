@@ -34,6 +34,15 @@ def del_directory_exists(directory: str):
     else:
         print("Directory does not exist!")
 
+class TempDir:
+
+    def __enter__(self):
+        self.temp_dir = mkdtemp()
+        return self.temp_dir
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        del_directory_exists(self.temp_dir)
+
 
 def grab_contributors(path: str) -> Iterable:
     found = False
@@ -120,30 +129,28 @@ class TopTranslators(SphinxDirective):
         ).lower()
 
         repo_url = f"https://github.com/{self.arguments[0]}.git"
-        
-        temp_dir = mkdtemp()
 
-        # Clone repo
-        try:
-            Repo.clone_from(repo_url, temp_dir)
-        except Exception as e:
-            raise ExtensionError("Invalid git repository given!", e)
+        with TempDir() as temp_dir:
 
-        top_contributors = get_top_translators(temp_dir, locale).most_common(limit)
+            # Clone repo
+            try:
+                Repo.clone_from(repo_url, temp_dir)
+            except Exception as e:
+                raise ExtensionError("Invalid git repository given!", e)
 
-        if "alphabetical" in order:
-            top_contributors.sort(key=lambda tup: tup[0])
+            top_contributors = get_top_translators(temp_dir, locale).most_common(limit)
 
-        del_directory_exists(temp_dir)
-        
-        return [
-            ContributorSource(
-                [
-                    Contributor(name, hide_contributions, contributions)
-                    for name, contributions in top_contributors
-                ]
-            ).build()
-        ]
+            if "alphabetical" in order:
+                top_contributors.sort(key=lambda tup: tup[0])
+            
+            return [
+                ContributorSource(
+                    [
+                        Contributor(name, hide_contributions, contributions)
+                        for name, contributions in top_contributors
+                    ]
+                ).build()
+            ]
 
 
 
