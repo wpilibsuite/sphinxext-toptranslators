@@ -1,20 +1,47 @@
 from collections import Counter
 from glob import glob
+import os
 from pathlib import Path
 import re
-import tempfile
-from typing import Any, Dict, Iterable, List, Mapping
+import shutil
+import stat
+from typing import Any, Dict, Iterable, List
 
 from docutils import nodes
 from docutils.parsers.rst import directives
+from git import Repo
 from sphinx.application import Sphinx
 from sphinx.errors import ExtensionError
 from sphinx.util.docutils import SphinxDirective
 
-from git import Repo
+from tempfile import mkdtemp
 
 
 TRANSLATORS_MARKER_NAME = "# Translators:"
+
+
+# Workaround due to git-python storing handles after program execution
+def del_rw(action, name, exc):
+    os.chmod(name, stat.S_IWRITE)
+    os.remove(name)
+
+
+# Delete directory if exists
+def del_directory_exists(directory: str):
+    dirpath = Path(directory)
+    if dirpath.exists() and dirpath.is_dir():
+        shutil.rmtree(dirpath, onerror=del_rw)
+    else:
+        print("Directory does not exist!")
+
+class TempDir:
+
+    def __enter__(self):
+        self.temp_dir = mkdtemp()
+        return self.temp_dir
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        del_directory_exists(self.temp_dir)
 
 
 def grab_contributors(path: str) -> Iterable:
@@ -101,9 +128,9 @@ class TopTranslators(SphinxDirective):
             "hide_contributions", "false"
         ).lower()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
+        repo_url = f"https://github.com/{self.arguments[0]}.git"
 
-            repo_url = f"https://github.com/{self.arguments[0]}.git"
+        with TempDir() as temp_dir:
 
             # Clone repo
             try:
@@ -124,6 +151,7 @@ class TopTranslators(SphinxDirective):
                     ]
                 ).build()
             ]
+
 
 
 def setup(app: Sphinx) -> Dict[str, Any]:
