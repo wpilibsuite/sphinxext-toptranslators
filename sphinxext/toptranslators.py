@@ -14,6 +14,8 @@ from sphinx.application import Sphinx
 from sphinx.errors import ExtensionError
 from sphinx.util.docutils import SphinxDirective
 
+from tempfile import mkdtemp
+
 
 TRANSLATORS_MARKER_NAME = "# Translators:"
 
@@ -98,7 +100,6 @@ class ContributorSource:
 
 
 class TopTranslators(SphinxDirective):
-    outdir = None
     has_content = True
     required_arguments = 1
     optional_arguments = 0
@@ -119,21 +120,21 @@ class TopTranslators(SphinxDirective):
         ).lower()
 
         repo_url = f"https://github.com/{self.arguments[0]}.git"
-        repo_dir =  str(Path(self.outdir) / "top_translators_cache" / self.arguments[0])
+        
+        temp_dir = mkdtemp()
 
         # Clone repo
         try:
-            del_directory_exists(repo_dir)
-            Repo.clone_from(repo_url, repo_dir)
+            Repo.clone_from(repo_url, temp_dir)
         except Exception as e:
             raise ExtensionError("Invalid git repository given!", e)
 
-        top_contributors = get_top_translators(repo_dir, locale).most_common(limit)
+        top_contributors = get_top_translators(temp_dir, locale).most_common(limit)
 
         if "alphabetical" in order:
             top_contributors.sort(key=lambda tup: tup[0])
 
-        del_directory_exists(repo_dir)
+        del_directory_exists(temp_dir)
         
         return [
             ContributorSource(
@@ -148,7 +149,7 @@ class TopTranslators(SphinxDirective):
 
 def setup(app: Sphinx) -> Dict[str, Any]:
     directives.register_directive("toptranslators", TopTranslators)
-    TopTranslators.outdir = app.outdir
+
     return {
         "parallel_read_safe": True,
         "parallel_write_safe": False,
