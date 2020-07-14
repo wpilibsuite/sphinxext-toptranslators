@@ -1,20 +1,36 @@
 from collections import Counter
 from glob import glob
+import os
 from pathlib import Path
 import re
-import tempfile
-from typing import Any, Dict, Iterable, List, Mapping
+import shutil
+import stat
+from typing import Any, Dict, Iterable, List
 
 from docutils import nodes
 from docutils.parsers.rst import directives
+from git import Repo
 from sphinx.application import Sphinx
 from sphinx.errors import ExtensionError
 from sphinx.util.docutils import SphinxDirective
 
-from git import Repo
-
 
 TRANSLATORS_MARKER_NAME = "# Translators:"
+
+
+# Workaround due to git-python storing handles after program execution
+def del_rw(action, name, exc):
+    os.chmod(name, stat.S_IWRITE)
+    os.remove(name)
+
+
+# Delete directory if exists
+def del_directory_exists(directory: str):
+    dirpath = Path(directory)
+    if dirpath.exists() and dirpath.is_dir():
+        shutil.rmtree(dirpath, onerror=del_rw)
+    else:
+        print("Directory does not exist!")
 
 
 def grab_contributors(path: str) -> Iterable:
@@ -82,6 +98,7 @@ class ContributorSource:
 
 
 class TopTranslators(SphinxDirective):
+    outdir = None
     has_content = True
     required_arguments = 1
     optional_arguments = 0
@@ -101,34 +118,37 @@ class TopTranslators(SphinxDirective):
             "hide_contributions", "false"
         ).lower()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
+        repo_url = f"https://github.com/{self.arguments[0]}.git"
+        repo_dir =  str(Path(self.outdir) / "top_translators_cache" / self.arguments[0])
 
-            repo_url = f"https://github.com/{self.arguments[0]}.git"
+        # Clone repo
+        try:
+            del_directory_exists(repo_dir)
+            Repo.clone_from(repo_url, repo_dir)
+        except Exception as e:
+            raise ExtensionError("Invalid git repository given!", e)
 
-            # Clone repo
-            try:
-                Repo.clone_from(repo_url, temp_dir)
-            except Exception as e:
-                raise ExtensionError("Invalid git repository given!", e)
+        top_contributors = get_top_translators(repo_dir, locale).most_common(limit)
 
-            top_contributors = get_top_translators(temp_dir, locale).most_common(limit)
+        if "alphabetical" in order:
+            top_contributors.sort(key=lambda tup: tup[0])
 
-            if "alphabetical" in order:
-                top_contributors.sort(key=lambda tup: tup[0])
-            
-            return [
-                ContributorSource(
-                    [
-                        Contributor(name, hide_contributions, contributions)
-                        for name, contributions in top_contributors
-                    ]
-                ).build()
-            ]
+        del_directory_exists(repo_dir)
+        
+        return [
+            ContributorSource(
+                [
+                    Contributor(name, hide_contributions, contributions)
+                    for name, contributions in top_contributors
+                ]
+            ).build()
+        ]
+
 
 
 def setup(app: Sphinx) -> Dict[str, Any]:
     directives.register_directive("toptranslators", TopTranslators)
-
+    TopTranslators.outdir = app.outdir
     return {
         "parallel_read_safe": True,
         "parallel_write_safe": False,
