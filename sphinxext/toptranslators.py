@@ -15,10 +15,17 @@ from sphinx.errors import ExtensionError
 from sphinx.util.docutils import SphinxDirective
 
 from tempfile import mkdtemp
+import unicodedata
 
 
 TRANSLATORS_MARKER_NAME = "# Translators:"
 
+# https://stackoverflow.com/questions/517923/what-is-the-best-way-to-remove-accents-normalize-in-a-python-unicode-string/518232#518232
+def strip_accents(s):
+    return "".join(
+        c for c in unicodedata.normalize('NFD', s)
+        if unicodedata.category(c) != 'Mn'
+    )
 
 # Workaround due to git-python storing handles after program execution
 def del_rw(action, name, exc):
@@ -141,7 +148,7 @@ class TopTranslators(SphinxDirective):
             top_contributors = get_top_translators(temp_dir, locale).most_common(limit)
 
             if "alphabetical" in order:
-                top_contributors.sort(key=lambda tup: tup[0])
+                top_contributors.sort(key=lambda tup: strip_accents(tup[0]))
             
             return [
                 ContributorSource(
