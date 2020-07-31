@@ -1,6 +1,7 @@
 import pytest
 import docutils.nodes as nodes
 import re
+from sphinxext.toptranslators import strip_accents
 
 
 @pytest.mark.sphinx("html", testroot="limit")
@@ -36,6 +37,7 @@ def test_order_alphabetical(html_contexts):
 
     for item in items:
         name = re.search(r"(.*) - (.*?) contribution", item.astext()).group(1)
+        name = strip_accents(name)
         if prev_name == None:
             prev_name = name
             continue
