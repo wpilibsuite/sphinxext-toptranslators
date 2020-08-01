@@ -19,17 +19,19 @@ def content(app):
 
 @pytest.fixture()
 def html_contexts(app):
-    HPCData = namedtuple("HPCData", ["app", "pagename", "templatename", "context", "doctree"])
+    HPCData = namedtuple(
+        "HPCData", ["app", "pagename", "templatename", "context", "doctree"]
+    )
     data = []
+
     def html_page_context(app, pagename, templatename, context, doctree):
         if doctree != None:
             data.append(HPCData(app, pagename, templatename, context, doctree))
-    app.connect('html-page-context', html_page_context)
+
+    app.connect("html-page-context", html_page_context)
     app.build()
     return data
 
 
 def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", "sphinx"
-    )
+    config.addinivalue_line("markers", "sphinx")

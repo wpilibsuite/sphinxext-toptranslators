@@ -1,4 +1,5 @@
 # sphinxext-toptranslators
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 Sphinx extension to grab top contributors from a PO directory that Sphinx generates.
 

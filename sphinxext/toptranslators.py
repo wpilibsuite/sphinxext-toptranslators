@@ -23,9 +23,9 @@ TRANSLATORS_MARKER_NAME = "# Translators:"
 # https://stackoverflow.com/questions/517923/what-is-the-best-way-to-remove-accents-normalize-in-a-python-unicode-string/518232#518232
 def strip_accents(s):
     return "".join(
-        c for c in unicodedata.normalize('NFD', s)
-        if unicodedata.category(c) != 'Mn'
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
     )
+
 
 # Workaround due to git-python storing handles after program execution
 def del_rw(action, name, exc):
@@ -41,8 +41,8 @@ def del_directory_exists(directory: str):
     else:
         print("Directory does not exist!")
 
-class TempDir:
 
+class TempDir:
     def __enter__(self):
         self.temp_dir = mkdtemp()
         return self.temp_dir
@@ -74,7 +74,9 @@ def grab_contributors(path: str) -> Iterable:
 def get_top_translators(translations_dir: str, locale: str) -> Counter:
     contributors = Counter()
 
-    po_files = glob(str(Path(translations_dir) / "**" / locale / "**" / "*.po"), recursive=True)
+    po_files = glob(
+        str(Path(translations_dir) / "**" / locale / "**" / "*.po"), recursive=True
+    )
 
     for file in po_files:
         contributors.update(grab_contributors(file))
@@ -149,7 +151,7 @@ class TopTranslators(SphinxDirective):
 
             if "alphabetical" in order:
                 top_contributors.sort(key=lambda tup: strip_accents(tup[0]))
-            
+
             return [
                 ContributorSource(
                     [
@@ -158,7 +160,6 @@ class TopTranslators(SphinxDirective):
                     ]
                 ).build()
             ]
-
 
 
 def setup(app: Sphinx) -> Dict[str, Any]:
