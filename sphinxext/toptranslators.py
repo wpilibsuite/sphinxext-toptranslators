@@ -20,6 +20,8 @@ import unicodedata
 
 TRANSLATORS_MARKER_NAME = "# Translators:"
 
+CACHE = {}
+
 # https://stackoverflow.com/questions/517923/what-is-the-best-way-to-remove-accents-normalize-in-a-python-unicode-string/518232#518232
 def strip_accents(s):
     return "".join(
@@ -137,32 +139,41 @@ class TopTranslators(SphinxDirective):
 
         repo_url = f"https://github.com/{self.arguments[0]}.git"
 
-        with TempDir() as temp_dir:
-
+        if repo_url in CACHE:
+            temp_dir = CACHE[repo_url]
+        else:
+            temp_dir = mkdtemp()
             # Clone repo
             try:
                 Repo.clone_from(repo_url, temp_dir)
             except Exception as e:
+                del_directory_exists(temp_dir)
                 raise ExtensionError("Invalid git repository given!", e)
+            CACHE[repo_url] = temp_dir
 
-            top_contributors = get_top_translators(temp_dir, locale).most_common(limit)
+        top_contributors = get_top_translators(temp_dir, locale).most_common(limit)
 
-            if "alphabetical" in order:
-                top_contributors.sort(key=lambda tup: strip_accents(tup[0]))
-            
-            return [
-                ContributorSource(
-                    [
-                        Contributor(name, hide_contributions, contributions)
-                        for name, contributions in top_contributors
-                    ]
-                ).build()
-            ]
+        if "alphabetical" in order:
+            top_contributors.sort(key=lambda tup: strip_accents(tup[0]))
 
+        return [
+            ContributorSource(
+                [
+                    Contributor(name, hide_contributions, contributions)
+                    for name, contributions in top_contributors
+                ]
+            ).build()
+        ]
+
+def cleanup_tempdirs(*args, **kwargs):
+    for url, temp_dir in CACHE.items():
+        del_directory_exists(temp_dir)
+    CACHE.clear()
 
 
 def setup(app: Sphinx) -> Dict[str, Any]:
     directives.register_directive("toptranslators", TopTranslators)
+    directives.connect("build-finished", cleanup_tempdirs)
 
     return {
         "parallel_read_safe": True,
