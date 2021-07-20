@@ -173,7 +173,7 @@ def cleanup_tempdirs(*args, **kwargs):
 
 def setup(app: Sphinx) -> Dict[str, Any]:
     directives.register_directive("toptranslators", TopTranslators)
-    directives.connect("build-finished", cleanup_tempdirs)
+    app.connect("build-finished", cleanup_tempdirs)
 
     return {
         "parallel_read_safe": True,
