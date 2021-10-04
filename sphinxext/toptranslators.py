@@ -145,7 +145,7 @@ class TopTranslators(SphinxDirective):
             temp_dir = mkdtemp()
             # Clone repo
             try:
-                Repo.clone_from(repo_url, temp_dir)
+                Repo.clone_from(repo_url, temp_dir, multi_options=["--depth 1"])
             except Exception as e:
                 del_directory_exists(temp_dir)
                 raise ExtensionError("Invalid git repository given!", e)
