@@ -141,7 +141,7 @@ class TopTranslators(SphinxDirective):
 
             # Clone repo
             try:
-                Repo.clone_from(repo_url, temp_dir)
+                Repo.clone_from(repo_url, temp_dir, multi_options=["--depth 1"])
             except Exception as e:
                 raise ExtensionError("Invalid git repository given!", e)
 
